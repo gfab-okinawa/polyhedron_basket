@@ -1,0 +1,271 @@
+<meta charset=utf-8>
+<script>
+function SVG(width, height){
+  this.width=width;
+  this.height=height;
+  this.content='';
+  this.lineWidth=1;
+  this.trans={x:0,y:0,w:1,h:1};
+}
+SVG.prototype={
+  toDataURL: function(){
+    var attributes = {
+      width: this.width+'mm',
+      height: this.height+'mm',
+      viewBox: [0,0,this.width,this.height].join(' '),
+      'stroke-width': this.lineWidth
+    }
+    var attrArray=[];
+    for(var key in attributes){
+      attrArray.push(key+'="'+attributes[key]+'"');
+    }
+    var data="<svg xmlns='http://www.w3.org/2000/svg' "+attrArray.join(' ')+">"+this.content+"</svg>"
+    return 'data:image/svg+xml,'+encodeURIComponent(data);
+  },
+  translate: function(p){
+    return {x:this.trans.x+p.x*this.trans.w,y:this.trans.y+p.y*this.trans.h}
+  },
+  transPoints: function(points){
+    var self=this;
+    return points.map(function(p){return self.translate(p)});
+  },
+  line: function(points, loop){
+    points=this.transPoints(points);
+    var out = [['M',points[0].x,points[0].y].join(' ')]
+    for(var i=1;i<points.length;i++){
+      var p=points[i];
+      out.push('L'+[p.x,p.y].join(' '));
+    }
+    this.content+="<path stroke='black' fill='none' d='"+out.join(' ')+(loop?'z':'')+"' />";
+  },
+  curve: function(points, loop){
+    points=this.transPoints(points);
+    if(points.length>2){
+      for(var i=0;i<points.length;i++){
+        var p=points[i],pa=points[i-1],pb=points[i+1];
+        if(loop&&!pa)pa=points[points.length-1];
+        if(loop&&!pb)pb=points[0];
+        if(!pa){
+          pp=points[2];
+          pa={x:3*p.x-3*pb.x+pp.x,y:3*p.y-3*pb.y+pp.y}
+        }
+        if(!pb){
+          pp=points[points.length-3];
+          pb={x:3*p.x-3*pa.x+pp.x,y:3*p.y-3*pa.y+pp.y}
+        }
+        var dx=pb.x-pa.x,dy=pb.y-pa.y;
+        var l=Math.sqrt(dx*dx+dy*dy);
+        p.dx=dx/l,p.dy=dy/l;
+      }
+    }
+    var out = [['M',points[0].x,points[0].y].join(' ')]
+    for(var i=1;i<=points.length;i++){
+      var p1=points[i-1],p2=points[i];
+      if(!p2){
+        if(!loop)continue;
+        p2=points[0];
+      }
+      var dx = p2.x-p1.x,dy=p2.y-p1.y;
+      var l = Math.sqrt(dx*dx+dy*dy);
+      out.push(
+        'C'+[
+          p1.x+l*(p1.dx||0)/3,
+          p1.y+l*(p1.dy||0)/3,
+          p2.x-l*(p2.dx||0)/3,
+          p2.y-l*(p2.dy||0)/3,
+          p2.x,p2.y
+        ].join(' ')
+      )
+    }
+    this.content+="<path stroke='black' fill='none' d='"+out.join(' ')+(loop?'z':'')+"' />"
+  }
+}
+
+onload=function(){
+  generate();
+}
+
+function generate(parameter){
+  var size=20;
+  var svg=new SVG(size*7.3,size*7.3);
+  window.svg=svg;
+  svg.lineWidth=0.1;
+  svg.trans={x:svg.width/3,y:svg.height/2,w:1,h:1};
+  var points=[];
+  for(var i=0;i<5;i++){
+    var cos=-Math.cos(2*Math.PI*i/5);
+    var sin=Math.sin(2*Math.PI*i/5);
+    var scale=size/Math.cos(Math.PI/5);
+    points.push({x:cos*scale,y:sin*scale});
+  }
+  svg.line(points,true);
+  var r0=size;
+  var r1=size/2;
+  var r2=size/2;
+  var theta1=Math.PI*25/180;
+  var theta2=Math.PI*50/180;
+  var len0=size*Math.tan(Math.PI/5);
+  var len1=len0+r1*Math.cos(theta1)*Math.tan(Math.PI/5)
+  var len2=len1+r2*Math.cos(theta2)*Math.tan(Math.PI/5)
+
+  function rotline(line,flag,flip,method){
+    if(!method)method='line';
+    for(var i=0;i<5;i++){
+      var c=Math.cos(2*Math.PI*i/5);
+      var s=Math.sin(2*Math.PI*i/5);
+      var l2=line.map(function(p){return{x:p.x*c-p.y*s,y:p.x*s+p.y*c};})
+      svg[method](l2,flag);
+      if(flip){
+        var l2=line.map(function(p){return{x:p.x*c+p.y*s,y:p.x*s-p.y*c};})
+        svg[method](l2,flag);
+      }
+    }
+  }
+
+
+  rotline([
+    {x:r0,y:len0},
+    {x:r0+r1,y:len1},
+    {x:r0+r1,y:-len1},
+    {x:r0,y:-len0},
+  ])
+  var qdx=1,qdy=(len2-len1)/r2;
+  var qdr=Math.sqrt(qdx*qdx+qdy*qdy);
+  qdx/=qdr;qdy/=qdr;
+  rotline([
+    {x:r0+r1,y:len1},
+    {x:r0+r1+r2,y:len2}],false,true);
+  rotline([
+    {x:r0+r1+r2,y:len2},
+    {x:r0+r1+r2+len2*qdy/qdx,y:0},
+    {x:r0+r1+r2,y:-len2},
+  ],false,false,'curve')
+
+  var T=2.7;//thickness
+  function square(x,y,dx,dy,L){
+    var dr=Math.sqrt(dx*dx+dy*dy)
+    dx/=dr;dy/=dr;
+    var W=svg.lineWidth;
+    rotline([
+      {x:x-dx*(L/2-W)+dy*(T/2-W),y:y-dy*(L/2-W)-dx*(T/2-W)},
+      {x:x-dx*(L/2-W)-dy*(T/2-W),y:y-dy*(L/2-W)+dx*(T/2-W)},
+      {x:x+dx*(L/2-W)-dy*(T/2-W),y:y+dy*(L/2-W)+dx*(T/2-W)},
+      {x:x+dx*(L/2-W)+dy*(T/2-W),y:y+dy*(L/2-W)-dx*(T/2-W)}
+      ],true,true
+    )
+  }
+  var L=5
+  var y=len0-L-T-T/2;
+  var sq0,sq1,sq2,sq3
+  square(sq0=r0-L/2-T,y,1,0,L)
+  square(sq1=r0+r1/2,y,1,0,L)
+  square(sq2=r0+r1+T+L/2,y,1,0,L)
+
+  var HOGE=0.67
+  var PIYO=0.27
+
+  square(sq3=r0+r1+r0*HOGE+L/2,y,1,0,L)
+
+  var qx=r0+r1+r2*PIYO
+  var qy=len1+(len2-len1)*PIYO
+  var qlen=(qy-y)/qdx-L/2;
+  var QL=L*2;
+  square(qx+qdy*qlen,qy-qdx*qlen,qdy,-qdx,QL);
+
+  var d0=T*Math.tan(theta1/2)
+  var d1=T*Math.tan((theta2-theta1)/2)
+  var c1=Math.cos(theta1);
+  var s1=Math.sin(theta1);
+  var c2=Math.cos(theta2);
+  var s2=Math.sin(theta2);
+
+
+  svg.trans.x=103;
+  svg.trans.y=2
+  for(var i=0;i<10;i++){
+    svg.trans.y+=8
+    svg.trans.x-=3.5
+    if(i==5){
+      svg.trans.x=106
+      svg.trans.y=69
+      console.log(svg.trans)
+    }
+    svg.line([
+      {x:0,y:0},
+      {x:T,y:0},
+      {x:T,y:T},
+      {x:T+L,y:T},
+      {x:T+L,y:0},
+      {x:ax1=T+L/2+(r0-sq0)+d0,y:ay1=0},
+      {x:(sx1=ax1+c1*(sq1-r0+d0))-c1*L/2,y:(sy1=ay1+s1*(sq1-r0+d0))-s1*L/2},
+      {x:sx1-c1*L/2-s1*T,y:sy1-s1*L/2+c1*T},
+      {x:sx1+c1*L/2-s1*T,y:sy1+s1*L/2+c1*T},
+      {x:sx1+c1*L/2,y:sy1+s1*L/2},
+      {x:(ax2=ax1+c1*(r1+d0+d1)),y:(ay2=ay1+s1*(r1+d0+d1))},
+      {x:(sx2=ax2+c2*(sq2-r1-r0+d1))-c2*L/2,y:(sy2=ay2+s2*(sq2-r1-r0+d1))-s2*L/2},
+      {x:sx2-c2*L/2-s2*T,y:sy2-s2*L/2+c2*T},
+      {x:sx2+c2*L/2-s2*T,y:sy2+s2*L/2+c2*T},
+      {x:sx2+c2*L/2,y:sy2+s2*L/2},
+      {x:(sx3=ax2+c2*(sq3-r1-r0+d1))-c2*L/2,y:(sy3=ay2+s2*(sq3-r1-r0+d1))-s2*L/2},
+      {x:sx3-c2*L/2-s2*T,y:sy3-s2*L/2+c2*T},
+      {x:sx3+c2*L/2-s2*T,y:sy3+s2*L/2+c2*T},
+      {x:sx3+c2*L/2,y:sy3+s2*L/2},
+      {x:xe=sx3+c2*(L/2+T),y:ye=sy3+s2*(L/2+T)},
+    ])
+    svg.curve([
+      {x:0,y:0},{x:r1/4,y:-L/2},{x:r1*3/4,y:-L/2},{x:r1,y:-L}
+    ])
+    svg.curve([
+      {x:r1+L,y:-L},{x:r1+L+L/3,y:-L/3},{x:r1+2*L,y:L/3},{x:xe-L,y:ye-2*L},{x:xe,y:ye}
+    ])
+    svg.line([{x:r1,y:-L},{x:r1+L,y:-L}])
+  }
+
+  var vecq={x:0,y:-Math.sin(theta2),z:Math.cos(theta2)};
+  var c5=Math.cos(2*Math.PI/5),s5=Math.sin(2*Math.PI/5);
+  var vecq2={x:c5*vecq.x-s5*vecq.y,y:c5*vecq.y+s5*vecq.x,z:vecq.z};
+  var dot=vecq.x*vecq2.x+vecq.y*vecq2.y+vecq.z*vecq2.z;
+  var thetaq=Math.acos(dot);
+  var dq=T*Math.tan(thetaq/2);
+
+  svg.trans.x=96
+  svg.trans.y=100
+  for(var i=0;i<5;i++){
+    svg.trans.y+=6.5
+    var cq=Math.cos(thetaq/2),sq=Math.sin(thetaq/2);
+    svg.line([
+      {x:-cq*(dq+qlen+QL/2-L),y:sq*(dq+qlen+QL/2-L)},
+      {x:-cq*(dq+qlen+QL/2),y:sq*(dq+qlen+QL/2)},
+      {x:-cq*(dq+qlen+QL/2)+sq*T,y:sq*(dq+qlen+QL/2)+cq*T},
+      {x:-cq*(dq+qlen-QL/2)+sq*T,y:sq*(dq+qlen-QL/2)+cq*T},
+      {x:-cq*(dq+qlen-QL/2),y:sq*(dq+qlen-QL/2)},
+      {x:0,y:0},
+      {x:cq*(dq+qlen-QL/2),y:sq*(dq+qlen-QL/2)},
+      {x:cq*(dq+qlen-QL/2)-sq*T,y:sq*(dq+qlen-QL/2)+cq*T},
+      {x:cq*(dq+qlen+QL/2)-sq*T,y:sq*(dq+qlen+QL/2)+cq*T},
+      {x:cq*(dq+qlen+QL/2),y:sq*(dq+qlen+QL/2)},
+      {x:xe=cq*(dq+qlen+QL/2-L),y:ye=sq*(dq+qlen+QL/2-L)},
+    ]);
+    svg.curve([
+      {x:xe,y:ye},
+      {x:0,y:-T},
+      {x:-xe,y:ye}
+    ])
+  }
+
+
+
+  var img=new Image();
+  img.src=svg.toDataURL();
+  img.style.border='1px solid red'
+  document.body.appendChild(img);
+}
+</script>
+<style>
+.floating{
+  position: fixed;right:0;top:0;
+  background:gray;
+  opacity:0.9;
+}
+.floating input{margin-bottom:4px;}
+</style>
