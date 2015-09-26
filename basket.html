@@ -81,22 +81,39 @@ SVG.prototype={
   }
 }
 
+var defaultThickness=3.0
+var defaultLazerWidth=0.1;
 onload=function(){
-  generate();
+  var thickness=parseFloat()||defaultThickness;
+  var lazerWidth=parseFloat()||defaultLazerWidth;
+  generate(thickness, lazerWidth);
 }
 
-function generate(parameter){
-  var size=20;
+function regenerate(){
+  function getf(name, defval){
+    return parseFloat(prompt(name, defval))||defval;
+  }
+  var img=document.querySelector('img');
+  img.parentNode.removeChild(img)
+  var thickness=getf('Thickness',defaultThickness)
+  var lazerWidth=getf('LazerWidth',defaultLazerWidth);
+  generate(thickness, lazerWidth);
+}
+
+function generate(thickness, lazerWidth){
+  var T=thickness||2.7;
+  var scale=T/2.7;
+  var size=20*scale;
   var svg=new SVG(size*7.3,size*7.3);
-  window.svg=svg;
-  svg.lineWidth=0.1;
   svg.trans={x:svg.width/3,y:svg.height/2,w:1,h:1};
+  svg.lineWidth=lazerWidth||0.1;
+  document.querySelector('span').textContent='Thickness='+T+' LazerWidth='+svg.lineWidth;
   var points=[];
   for(var i=0;i<5;i++){
     var cos=-Math.cos(2*Math.PI*i/5);
     var sin=Math.sin(2*Math.PI*i/5);
-    var scale=size/Math.cos(Math.PI/5);
-    points.push({x:cos*scale,y:sin*scale});
+    var sc=size/Math.cos(Math.PI/5);
+    points.push({x:cos*sc,y:sin*sc});
   }
   svg.line(points,true);
   var r0=size;
@@ -141,7 +158,6 @@ function generate(parameter){
     {x:r0+r1+r2,y:-len2},
   ],false,false,'curve')
 
-  var T=2.7;//thickness
   function square(x,y,dx,dy,L){
     var dr=Math.sqrt(dx*dx+dy*dy)
     dx/=dr;dy/=dr;
@@ -154,7 +170,7 @@ function generate(parameter){
       ],true,true
     )
   }
-  var L=5
+  var L=5*scale
   var y=len0-L-T-T/2;
   var sq0,sq1,sq2,sq3
   square(sq0=r0-L/2-T,y,1,0,L)
@@ -180,14 +196,14 @@ function generate(parameter){
   var s2=Math.sin(theta2);
 
 
-  svg.trans.x=103;
-  svg.trans.y=2
+  svg.trans.x=103*scale;
+  svg.trans.y=2*scale
   for(var i=0;i<10;i++){
-    svg.trans.y+=8
-    svg.trans.x-=3.5
+    svg.trans.y+=8*scale
+    svg.trans.x-=3.5*scale
     if(i==5){
-      svg.trans.x=106
-      svg.trans.y=69
+      svg.trans.x=106*scale
+      svg.trans.y=69*scale
       console.log(svg.trans)
     }
     svg.line([
@@ -228,10 +244,10 @@ function generate(parameter){
   var thetaq=Math.acos(dot);
   var dq=T*Math.tan(thetaq/2);
 
-  svg.trans.x=96
-  svg.trans.y=100
+  svg.trans.x=96*scale
+  svg.trans.y=100*scale
   for(var i=0;i<5;i++){
-    svg.trans.y+=6.5
+    svg.trans.y+=6.5*scale
     var cq=Math.cos(thetaq/2),sq=Math.sin(thetaq/2);
     svg.line([
       {x:-cq*(dq+qlen+QL/2-L),y:sq*(dq+qlen+QL/2-L)},
@@ -253,8 +269,6 @@ function generate(parameter){
     ])
   }
 
-
-
   var img=new Image();
   img.src=svg.toDataURL();
   img.style.border='1px solid red'
@@ -269,3 +283,5 @@ function generate(parameter){
 }
 .floating input{margin-bottom:4px;}
 </style>
+<span></span>
+<button onclick='regenerate()'>regenerate</button><br>
