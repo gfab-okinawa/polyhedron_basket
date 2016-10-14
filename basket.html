@@ -1,9 +1,11 @@
 <meta charset=utf-8>
+<script src='bezier.js'></script>
 <script>
 function SVG(width, height){
   this.width=width;
   this.height=height;
   this.content='';
+  this.color='black';
   this.lineWidth=1;
   this.trans={x:0,y:0,w:1,h:1};
 }
@@ -29,16 +31,28 @@ SVG.prototype={
     var self=this;
     return points.map(function(p){return self.translate(p)});
   },
-  line: function(points, loop){
+  line: function(points, loop, color){
     points=this.transPoints(points);
     var out = [['M',points[0].x,points[0].y].join(' ')]
     for(var i=1;i<points.length;i++){
       var p=points[i];
       out.push('L'+[p.x,p.y].join(' '));
     }
-    this.content+="<path stroke='black' fill='none' d='"+out.join(' ')+(loop?'z':'')+"' />";
+    this.content+="<path stroke='"+(color||this.color)+"' fill='none' d='"+out.join(' ')+(loop?'z':'')+"' />";
   },
-  curve: function(points, loop){
+  bezier: function(bezier,color){
+    bezier=this.transPoints(bezier)
+    var out = [
+      ['M',bezier[0].x,bezier[0].y].join(' '),
+      'C'+[
+        bezier[1].x,bezier[1].y,
+        bezier[2].x,bezier[2].y,
+        bezier[3].x,bezier[3].y
+      ].join(' ')
+    ]
+    this.content+="<path stroke='"+(color||this.color)+"' fill='none' d='"+out.join(' ')+"' />"
+  },
+  curve: function(points, loop, color){
     points=this.transPoints(points);
     if(points.length>2){
       for(var i=0;i<points.length;i++){
@@ -77,7 +91,7 @@ SVG.prototype={
         ].join(' ')
       )
     }
-    this.content+="<path stroke='black' fill='none' d='"+out.join(' ')+(loop?'z':'')+"' />"
+    this.content+="<path stroke='"+(color||this.color)+"' fill='none' d='"+out.join(' ')+(loop?'z':'')+"' />"
   }
 }
 
@@ -105,6 +119,7 @@ function generate(thickness, lazerWidth){
   var scale=T/2.7;
   var size=20*scale;
   var svg=new SVG(size*7.3,size*7.3);
+  svg.color='red'
   svg.trans={x:svg.width/3,y:svg.height/2,w:1,h:1};
   svg.lineWidth=lazerWidth||0.1;
   document.querySelector('span').textContent='Thickness='+T+' LazerWidth='+svg.lineWidth;
@@ -194,6 +209,70 @@ function generate(thickness, lazerWidth){
   var s1=Math.sin(theta1);
   var c2=Math.cos(theta2);
   var s2=Math.sin(theta2);
+
+
+  var shapes=[
+    [{x:50,y:20},{x:80,y:90},{x:10,y:60}, {x:80,y:40}]
+  ]
+  for(var i=0;i<40;i++){
+    var prev=shapes[shapes.length-1]
+    var next={
+      x: prev[3].x*0.5+0.5*(100*Math.random()-50),
+      y: prev[3].y*0.5+0.5*(100*Math.random()-50)
+    }
+    shapes.push([
+      {x: prev[3].x, y: prev[3].y},
+      {x: 2*prev[3].x-prev[2].x, y: 2*prev[3].y-prev[2].y},
+      {x: next.x+40*Math.random()-20, y: next.y+40*Math.random()-20},
+      next,
+    ])
+  }
+  function slice(bezs,pa,pb){
+    var arr=[]
+    bezs.forEach(function(b){bezierLineSlice(b,sliceLineParams(pa,pb)).forEach(function(b){arr.push(b)})})
+    return arr
+  }
+  var bezs=shapes
+  for(var i=0;i<points.length;i++)bezs=slice(bezs,points[i],points[(i+1)%points.length],points[i])
+  bezs.forEach(function(b){
+    svg.bezier(b,'black')
+  })
+  faceShape(r0, r0,theta1,'black',[
+    {x:r0,y:len0},
+    {x:r0+r1,y:len1},
+    {x:r0+r1,y:-len1},
+    {x:r0,y:-len0},
+  ])
+  faceShape(r0+r1, r0+r1*Math.cos(theta1),theta2,'black',[
+    {x:r0+r1,y:len1},
+    {x:r0+r1+r2,y:len2},
+    {x:r0+r1+r2+len2*qdy/qdx,y:0},
+    {x:r0+r1+r2,y:-len2},
+    {x:r0+r1,y:-len1}
+  ])
+  function faceShape(dst, offset, theta, color, coords){
+    for(var i=0;i<5;i++){
+      var t=2*Math.PI*i/5,cos=Math.cos(t),sin=Math.sin(t)
+      var dir={x:cos,y:sin}
+      var rotcoords=coords.map(function(p){return {x:p.x*cos-p.y*sin,y:p.x*sin+p.y*cos}})
+      var bezs=shapes.map(function(b){
+        return b.map(function(p){
+          var dot=p.x*dir.x+p.y*dir.y;
+          dot=dst+(dot-offset)/Math.cos(theta)
+          var cross=p.x*dir.y-p.y*dir.x;
+          return {
+            x: cross*dir.y+dot*dir.x,
+            y: -cross*dir.x+dot*dir.y
+          }
+        })
+      });
+      for(var j=0;j<rotcoords.length;j++)bezs=slice(bezs,rotcoords[j],rotcoords[(j+1)%rotcoords.length])
+      bezs.forEach(function(b){
+        svg.bezier(b,color)
+      })
+    }
+  }
+
 
 
   svg.trans.x=103*scale;
