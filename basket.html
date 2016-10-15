@@ -1,5 +1,6 @@
 <meta charset=utf-8>
 <script src='bezier.js'></script>
+<script src='svg2bezier.js'></script>
 <script>
 function SVG(width, height){
   this.width=width;
@@ -9,6 +10,7 @@ function SVG(width, height){
   this.lineWidth=1;
   this.trans={x:0,y:0,w:1,h:1};
 }
+var imageBeziers=null
 SVG.prototype={
   toDataURL: function(){
     var attributes = {
@@ -95,22 +97,43 @@ SVG.prototype={
   }
 }
 
-var defaultThickness=3.0
-var defaultLazerWidth=0.1;
+function inputParam(name,defaultValue){
+  var val=parseFloat(document.querySelector('input[name='+name+']').value)
+  return isNaN(val)?defaultValue:val
+}
 onload=function(){
-  var thickness=parseFloat()||defaultThickness;
-  var lazerWidth=parseFloat()||defaultLazerWidth;
-  generate(thickness, lazerWidth);
+  regenerate();
+
+  inputs=document.querySelectorAll('input')
+  for(var i=0;i<inputs.length;i++){
+    inputs[i].onchange=function(){
+      file=document.querySelector('input[type=file]').files[0]
+      if(!file){imageBeziers=null;regenerate()}
+      if(file){
+        var fr=new FileReader()
+        fr.readAsText(file)
+        fr.onload=function(){
+          imageBeziers=svg2bezier(fr.result)
+          imageBeziers.params={
+            x: inputParam('x',0),
+            y: inputParam('y',0),
+            scale: inputParam('scale',1),
+            rotate: inputParam('rotate',0)
+          }
+          regenerate()
+        }
+      }
+
+    }
+  }
+
 }
 
 function regenerate(){
-  function getf(name, defval){
-    return parseFloat(prompt(name, defval))||defval;
-  }
   var img=document.querySelector('img');
-  img.parentNode.removeChild(img)
-  var thickness=getf('Thickness',defaultThickness)
-  var lazerWidth=getf('LazerWidth',defaultLazerWidth);
+  if(img)img.parentNode.removeChild(img)
+  var thickness=inputParam('thickness',3.0)
+  var lazerWidth=inputParam('lazerwidth',0.1);
   generate(thickness, lazerWidth);
 }
 
@@ -210,23 +233,24 @@ function generate(thickness, lazerWidth){
   var c2=Math.cos(theta2);
   var s2=Math.sin(theta2);
 
-
-  var shapes=[
-    [{x:50,y:20},{x:80,y:90},{x:10,y:60}, {x:80,y:40}]
-  ]
-  for(var i=0;i<40;i++){
-    var prev=shapes[shapes.length-1]
-    var next={
-      x: prev[3].x*0.5+0.5*(100*Math.random()-50),
-      y: prev[3].y*0.5+0.5*(100*Math.random()-50)
-    }
-    shapes.push([
-      {x: prev[3].x, y: prev[3].y},
-      {x: 2*prev[3].x-prev[2].x, y: 2*prev[3].y-prev[2].y},
-      {x: next.x+40*Math.random()-20, y: next.y+40*Math.random()-20},
-      next,
-    ])
+  shapes=[]
+  if(imageBeziers){
+    var t=Math.PI*imageBeziers.params.rotate/180
+    var cos=Math.cos(t), sin=Math.sin(t)
+    shapes=imageBeziers.map(function(b){
+      return b.map(function(p){
+        var scale=2*(r0+r1+r2)*imageBeziers.params.scale
+        var x=scale*p.x+imageBeziers.params.x
+        var y=scale*p.y-imageBeziers.params.y
+        return {
+          x: x*cos+y*sin,
+          y: -x*sin+y*cos
+        }
+      })
+    })
   }
+
+
   function slice(bezs,pa,pb){
     var arr=[]
     bezs.forEach(function(b){bezierLineSlice(b,sliceLineParams(pa,pb)).forEach(function(b){arr.push(b)})})
@@ -246,7 +270,8 @@ function generate(thickness, lazerWidth){
   faceShape(r0+r1, r0+r1*Math.cos(theta1),theta2,'black',[
     {x:r0+r1,y:len1},
     {x:r0+r1+r2,y:len2},
-    {x:r0+r1+r2+len2*qdy/qdx,y:0},
+    {x:r0+r1+r2+len2*qdy/qdx,y:len2/2},
+    {x:r0+r1+r2+len2*qdy/qdx,y:-len2/2},
     {x:r0+r1+r2,y:-len2},
     {x:r0+r1,y:-len1}
   ])
@@ -363,4 +388,13 @@ function generate(thickness, lazerWidth){
 .floating input{margin-bottom:4px;}
 </style>
 <span></span>
-<button onclick='regenerate()'>regenerate</button><br>
+<input name=thickness placeholder=thickness(3.0)>
+<input name=lazerwidth placeholder=lazerwidth(0.1)>
+<hr>
+<div id='image'>
+  svg:<input type=file>
+  <input name=scale placeholder=scale>
+  <input name=rotate placeholder=rotate>
+  <input name=x placeholder=x>
+  <input name=y placeholder=y>
+</div>
