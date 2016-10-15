@@ -120,8 +120,10 @@ function svg2bezier(data){
         switch(type){
           case 'm':
           case 'M':
-            point=pathpoint(point,values[0])
-            start=point
+            for(var j=0;j<values.length;j++){
+              point=pathpoint(point,values[j])
+              start=point
+            }
             break
           case 'c':
           case 'C':
@@ -151,15 +153,19 @@ function svg2bezier(data){
             break
           case 'h':
           case 'H':
-            var p={x: type<='Z'?floats[0]:point.x+floats[0], y: point.y}
-            line(point, p)
-            point=p
+            for(var j=0;j<floats.length;j++){
+              var p={x: type<='Z'?floats[j]:point.x+floats[j], y: point.y}
+              line(point, p)
+              point=p
+            }
             break
           case 'v':
           case 'V':
-            var p={x: point.x, y: type<='Z'?floats[0]:point.y+floats[0]}
-            line(point, p)
-            point=p
+            for(var j=0;j<floats.length;j++){
+              var p={x: point.x, y: type<='Z'?floats[j]:point.y+floats[j]}
+              line(point, p)
+              point=p
+            }
             break
           case 'q':
           case 'Q':
@@ -209,6 +215,8 @@ function svg2bezier(data){
           case 'Z':
             if(start.x!=point.x||start.y!=point.y)line(point,start)
             break
+          default:
+            console.error(type)
         }
       }
     }
