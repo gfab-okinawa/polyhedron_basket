@@ -5,9 +5,7 @@ function svg2bezier(data){
     function each(el, trans){
       if(!trans)trans=[1,0,0,1,0,0]
       var transform=(el.tagName&&el.getAttribute('transform'))
-      if(transform)console.log(transform)
       var matched=transform&&transform.match(/\w+\([^\)]+\)/g)
-      if(transform)console.log(matched)
       if(matched){
         matched.forEach(function(){
           var tv=transform.split(/[()]/, 2)
@@ -115,19 +113,29 @@ function svg2bezier(data){
             break
           case 'c':
           case 'C':
-            bezier(point, pathpoint(point,values[0]), pathpoint(point,values[1]), pathpoint(point,values[2]))
-            point=pathpoint(point,values[2])
+            for(var j=0;j<values.length/3;j++){
+              var p1=pathpoint(point,values[3*j]), p2=pathpoint(point,values[3*j+1]), p3=pathpoint(point,values[3*j+2])
+              bezier(point, p1, p2, p3)
+              point=p3
+            }
             break
           case 's':
           case 'S':
-            var bprev=beziers[beziers.length-1][2]||point
-            bezier(point, {x: 2*point.x-bprev.x, y: 2*point.y-bprev.y}, pathpoint(point,values[0]), pathpoint(point,values[1]))
-            point=pathpoint(point,values[1])
+            for(var j=0;j<values.length/2;j++){
+              var bprev=beziers[beziers.length-1][2]||point
+              var p1={x: 2*point.x-bprev.x, y: 2*point.y-bprev.y}
+              var p2=pathpoint(point,values[2*j]), p3=pathpoint(point,values[2*j+1])
+              bezier(point, p1, p2, p3)
+              point=p3
+            }
             break
           case 'l':
           case 'L':
-            line(point, pathpoint(point,values[0]))
-            point=pathpoint(point,values[0])
+            for(var j=0;j<values.length;j++){
+              var p=pathpoint(point,values[j])
+              line(point, p)
+              point=p
+            }
             break
           case 'h':
           case 'H':
@@ -143,10 +151,12 @@ function svg2bezier(data){
             break
           case 'q':
           case 'Q':
-            var p1=pathpoint(point, values[0])
-            var p2=pathpoint(point, values[1])
-            bezier(point, {x:(point.x+2*p1.x)/3,y:(point.y+2*p1.y)/3}, {x:(p2.x+2*p1.x)/3,y:(p2.y+2*p1.y)/3}, p2)
-            point=p2
+            for(var j=0;j<values.length/2;j++){
+              var p1=pathpoint(point, values[2*j])
+              var p2=pathpoint(point, values[2*j+1])
+              bezier(point, {x:(point.x+2*p1.x)/3,y:(point.y+2*p1.y)/3}, {x:(p2.x+2*p1.x)/3,y:(p2.y+2*p1.y)/3}, p2)
+              point=p2
+            }
             break
           case 'z':
           case 'Z':
