@@ -61,24 +61,34 @@ function svg2bezier(data){
       bezier(p0,{x:(2*p0.x+p1.x)/3,y:(2*p0.y+p1.y)/3},{x:(p0.x+2*p1.x)/3,y:(p0.y+2*p1.y)/3},p1)
     }
     function fval(key){return parseFloat(el.getAttribute(key))}
-    function ellipse(cx,cy,rx,ry){
-      var N=16;
+    function arc(cx,cy,rx,ry,tfrom,tto,rot){
+      if(tfrom===undefined){
+        tfrom=0
+        tto=2*Math.PI
+      }
+      var cos=Math.cos(rot||0), sin=Math.sin(rot)
+      var N=16
       for(var i=0;i<N;i++){
-        var t0=2*Math.PI*i/N,t1=2*Math.PI*(i+1)/N
-        var l=1/Math.cos(2*Math.PI/N/3)
+        var t0=tfrom+(tto-tfrom)*i/N,t1=tfrom+(tto-tfrom)*(i+1)/N
+        var l=1/Math.cos((t1-t0)/3)
         var p0={x: Math.cos(t0), y: Math.sin(t0)}
         var p1={x: l*Math.cos((2*t0+t1)/3), y: l*Math.sin((2*t0+t1)/3)}
         var p2={x: l*Math.cos((t0+2*t1)/3), y: l*Math.sin((t0+2*t1)/3)}
         var p3={x: Math.cos(t1), y: Math.sin(t1)}
-        var p0123=[p0,p1,p2,p3].map(function(p){return {x:cx+rx*p.x,y:cy+ry*p.y}})
+        var p0123=[p0,p1,p2,p3].map(function(p){
+          return {
+            x:cx+rx*p.x*cos-ry*p.y*sin,
+            y:cy+ry*p.y*cos+rx*p.x*sin
+          }
+        })
         bezier.apply(null, p0123)
       }
     }
     if(el.tagName=='circle'){
-      ellipse(fval('cx'),fval('cy'),fval('r'),fval('r'))
+      arc(fval('cx'),fval('cy'),fval('r'),fval('r'))
     }
     if(el.tagName=='ellipse'){
-      ellipse(fval('cx'),fval('cy'),fval('rx'),fval('ry'))
+      arc(fval('cx'),fval('cy'),fval('rx'),fval('ry'))
     }
     if(el.tagName=='polygon'||el.tagName=='polyline'){
       var floats=el.getAttribute('points').match(/-?[\d.]+/g).map(parseFloat)
@@ -100,8 +110,12 @@ function svg2bezier(data){
         var values=[];
         for(var j=0;2*j<floats.length;j++)values.push({x: floats[2*j], y: floats[2*j+1]})
         function pathpoint(a,b){
-          if(type<='Z')return b
+          if(!a||type<='Z')return b
           return {x: a.x+b.x, y:a.y+b.y}
+        }
+        function pathvalue(a,b){
+          if(type<='Z')return b
+          return (a||0)+b
         }
         switch(type){
           case 'm':
@@ -154,6 +168,41 @@ function svg2bezier(data){
               var p2=pathpoint(point, values[2*j+1])
               bezier(point, {x:(point.x+2*p1.x)/3,y:(point.y+2*p1.y)/3}, {x:(p2.x+2*p1.x)/3,y:(p2.y+2*p1.y)/3}, p2)
               point=p2
+            }
+            break
+          case 'a':
+          case 'A':
+            for(var j=0;j<floats.length/7;j++){
+              var rx=floats[7*j], ry=floats[7*j+1], rot=floats[7*j+2]*Math.PI/180
+              var lflag=floats[7*j+3], sflag=floats[7*j+4]
+              var dst={x: pathvalue(point.x,floats[7*j+5]), y: pathvalue(point.y,floats[7*j+6])}
+              var xvec={x: Math.cos(rot), y: Math.sin(rot)}
+              var yvec={x: -xvec.y, y: xvec.x}
+              var x0=(point.x*xvec.x+point.y*xvec.y)/rx
+              var y0=(point.x*yvec.x+point.y*yvec.y)/ry
+              var x1=(dst.x*xvec.x+dst.y*xvec.y)/rx
+              var y1=(dst.x*yvec.x+dst.y*yvec.y)/ry
+              var dl=Math.sqrt((x1-x0)*(x1-x0)+(y1-y0)*(y1-y0))/2
+              var dh=Math.sqrt(1-dl*dl)
+              var dir=((sflag&&1)+(lflag&&1))%2?-1:1
+              var cx=(x0+x1)/2+dir*(y1-y0)*dh/dl/2
+              var cy=(y0+y1)/2-dir*(x1-x0)*dh/dl/2
+
+              var t0=Math.atan2(y0-cy,x0-cx)
+              var t1=Math.atan2(y1-cy,x1-cx)
+              function swap(){var _t0=t0;t0=t1;t1=_t0}
+              if(t1<t0)swap()
+              if(t1>t0+Math.PI){
+                t1-=2*Math.PI
+                swap()
+              }
+              if(lflag){t1-=2*Math.PI}
+              arc(
+                cx*rx*xvec.x+cy*ry*yvec.x,
+                cx*rx*xvec.y+cy*ry*yvec.y,
+                rx,ry,t0,t1,rot
+              )
+              point=dst
             }
             break
           case 'z':
