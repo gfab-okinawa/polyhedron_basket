@@ -84,6 +84,16 @@ function svg2bezier(data){
     if(el.tagName=='ellipse'){
       ellipse(fval('cx'),fval('cy'),fval('rx'),fval('ry'))
     }
+    if(el.tagName=='polygon'||el.tagName=='polyline'){
+      var floats=el.getAttribute('points').match(/-?[\d.]+/g).map(parseFloat)
+      var numpoints=floats.length/2+(el.tagName=='polygon'?1:0)
+      for(var i=0;i<numpoints;i++){
+        var p={x: floats[2*i], y: floats[2*i+1]}
+        var q={x: floats[(2*i+2)%floats.length], y: floats[(2*i+3)%floats.length]}
+        line(p, q)
+        point=q
+      }
+    }
     if(el.tagName=='path'){
       var matches=el.getAttribute('d').match(/[A-Za-z][^a-zA-Z]*/g)
       var point=null
