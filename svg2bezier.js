@@ -1,9 +1,7 @@
 function svg2bezier(data){
   var div=document.createElement('div')
   div.innerHTML=data
-  function traverse(el, names, cb){
-    var nameset={}
-    names.forEach(function(n){nameset[n]=true})
+  function traverse(el, cb){
     function each(el, trans){
       if(!trans)trans=[1,0,0,1,0,0]
       var transform=(el.tagName&&el.getAttribute('transform'))
@@ -39,8 +37,10 @@ function svg2bezier(data){
       }
       for(var i=0;i<el.childNodes.length;i++){
         var e=el.childNodes[i]
-        if(e.tagName)each(e, trans)
-        if(nameset[e.tagName])cb(e, trans)
+        if(e.tagName){
+          each(e, trans)
+          cb(e, trans)
+        }
       }
     }
     each(el)
@@ -52,7 +52,7 @@ function svg2bezier(data){
     }
   }
   var beziers=[]
-  traverse(div, ['path', 'ellipse'], function(el, trans){
+  traverse(div, function(el, trans){
     function bezier(p0,p1,p2,p3){
       beziers.push([
         translate(p0,trans),
@@ -68,8 +68,8 @@ function svg2bezier(data){
     function ellipse(cx,cy,rx,ry){
       var N=16;
       for(var i=0;i<N;i++){
-        var t0=i*Math.PI/N,t1=(i+1)*Math.PI/N
-        var l=1/Math.cos(Math.PI/N/3)
+        var t0=2*Math.PI*i/N,t1=2*Math.PI*(i+1)/N
+        var l=1/Math.cos(2*Math.PI/N/3)
         var p0={x: Math.cos(t0), y: Math.sin(t0)}
         var p1={x: l*Math.cos((2*t0+t1)/3), y: l*Math.sin((2*t0+t1)/3)}
         var p2={x: l*Math.cos((t0+2*t1)/3), y: l*Math.sin((t0+2*t1)/3)}
@@ -105,10 +105,14 @@ function svg2bezier(data){
             break
           case 'c':
           case 'C':
-          try{
             bezier(point, pathpoint(point,values[0]), pathpoint(point,values[1]), pathpoint(point,values[2]))
-          }catch(e){console.error(point,values,matches[i],window.mama=matches);console.error(e);hoge()}
             point=pathpoint(point,values[2])
+            break
+          case 's':
+          case 'S':
+            var bprev=beziers[beziers.length-1][2]||point
+            bezier(point, {x: 2*point.x-bprev.x, y: 2*point.y-bprev.y}, pathpoint(point,values[0]), pathpoint(point,values[1]))
+            point=pathpoint(point,values[1])
             break
           case 'l':
           case 'L':
@@ -117,23 +121,27 @@ function svg2bezier(data){
             break
           case 'h':
           case 'H':
-            var v=values[0].x
-            line(point, (point={x: type<='Z'?v:point.x+v, y: point.y}))
+            var p={x: type<='Z'?floats[0]:point.x+floats[0], y: point.y}
+            line(point, p)
+            point=p
             break
           case 'v':
           case 'V':
-            var v=values[0].x
-            line(point, (point={x: point.x, y:type<='Z'?v:point.y+v}))
+            var p={x: point.x, y: type<='Z'?floats[0]:point.y+floats[0]}
+            line(point, p)
+            point=p
+            break
+          case 'q':
+          case 'Q':
+            var p1=pathpoint(point, values[0])
+            var p2=pathpoint(point, values[1])
+            bezier(point, {x:(point.x+2*p1.x)/3,y:(point.y+2*p1.y)/3}, {x:(p2.x+2*p1.x)/3,y:(p2.y+2*p1.y)/3}, p2)
+            point=p2
             break
           case 'z':
           case 'Z':
             if(start.x!=point.x||start.y!=point.y)line(point,start)
             break
-        }
-
-        if(isNaN(point.x)){
-          console.error(el.getAttribute('d'))
-          hoge()
         }
       }
     }
