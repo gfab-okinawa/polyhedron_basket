@@ -33,12 +33,10 @@ function svg2bezier(data){
           ]
         })
       }
+      cb(el, trans)
       for(var i=0;i<el.childNodes.length;i++){
         var e=el.childNodes[i]
-        if(e.tagName){
-          each(e, trans)
-          cb(e, trans)
-        }
+        if(e.tagName)each(e, trans)
       }
     }
     each(el)
@@ -109,7 +107,7 @@ function svg2bezier(data){
           case 'm':
           case 'M':
             point=pathpoint(point,values[0])
-            if(!start)start=point
+            start=point
             break
           case 'c':
           case 'C':
