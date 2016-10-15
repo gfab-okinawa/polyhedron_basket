@@ -66,7 +66,7 @@ function svg2bezier(data){
         tfrom=0
         tto=2*Math.PI
       }
-      var cos=Math.cos(rot||0), sin=Math.sin(rot)
+      var cos=Math.cos(rot||0), sin=Math.sin(rot||0)
       var N=16
       for(var i=0;i<N;i++){
         var t0=tfrom+(tto-tfrom)*i/N,t1=tfrom+(tto-tfrom)*(i+1)/N
