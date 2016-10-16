@@ -40,7 +40,7 @@ SVG.prototype={
       var p=points[i];
       out.push('L'+[p.x,p.y].join(' '));
     }
-    this.content+="<path stroke='"+(color||this.color)+"' fill='none' d='"+out.join(' ')+(loop?'z':'')+"' />";
+    this.content+="<path stroke='"+(color||this.color)+"' fill='none' d='"+out.join(' ')+(loop?'z':'')+"' />\n";
   },
   bezier: function(bezier,color){
     bezier=this.transPoints(bezier)
@@ -52,7 +52,46 @@ SVG.prototype={
         bezier[3].x,bezier[3].y
       ].join(' ')
     ]
-    this.content+="<path stroke='"+(color||this.color)+"' fill='none' d='"+out.join(' ')+"' />"
+    this.content+="<path stroke='"+(color||this.color)+"' fill='none' d='"+out.join(' ')+"' />\n"
+  },
+  fillPath: function(path, color){
+    if(!path.length)return
+    window.pathpath=path
+    var self = this
+    var linemap={}
+    path.forEach(function(bezier){
+      var key=[bezier[0].x,bezier[0].y]
+      linemap[key]=linemap[key]||[]
+      linemap[key].push(bezier)
+    })
+    var sorted=[]
+    while(true){
+      var key = null
+      for(key in linemap)break
+      if(!key)break
+      while(linemap[key]){
+        var bez=linemap[key].pop()
+        sorted.push(bez)
+        if(linemap[key].length==0)delete linemap[key]
+        key=[bez[3].x,bez[3].y]
+      }
+    }
+    window.sorsor=sorted
+    var out=sorted.map(function(bezier,i){
+      var b=self.transPoints(bezier)
+      var m=['M', b[0].x, b[0].y]
+      var c=[
+        'C',
+        b[1].x,b[1].y,
+        b[2].x,b[2].y,
+        b[3].x,b[3].y
+      ]
+      if(i==0)return m.concat(c).join(' ')
+      if(sorted[i-1][3].x!=bezier[0].x||sorted[i-1][3].y!=bezier[0].y)return m.concat(c).join(' ')
+      return c.join(' ')
+    })
+    window.ouou=out
+    this.content+="<path opacity='0.5' fill='"+(color||this.color)+"' d='"+out.join(' ')+"' />\n"
   },
   curve: function(points, loop, color){
     points=this.transPoints(points);
@@ -93,7 +132,7 @@ SVG.prototype={
         ].join(' ')
       )
     }
-    this.content+="<path stroke='"+(color||this.color)+"' fill='none' d='"+out.join(' ')+(loop?'z':'')+"' />"
+    this.content+="<path stroke='"+(color||this.color)+"' fill='none' d='"+out.join(' ')+(loop?'z':'')+"' />\n"
   }
 }
 
@@ -252,15 +291,14 @@ function generate(thickness, lazerWidth){
 
 
   function slice(bezs,pa,pb){
+    return pathLineSlice(bezs,sliceLineParams(pa,pb))
     var arr=[]
     bezs.forEach(function(b){bezierLineSlice(b,sliceLineParams(pa,pb)).forEach(function(b){arr.push(b)})})
     return arr
   }
   var bezs=shapes
   for(var i=0;i<points.length;i++)bezs=slice(bezs,points[i],points[(i+1)%points.length],points[i])
-  bezs.forEach(function(b){
-    svg.bezier(b,'black')
-  })
+  svg.fillPath(bezs,'black')
   faceShape(r0, r0,theta1,'black',[
     {x:r0,y:len0},
     {x:r0+r1,y:len1},
@@ -292,9 +330,10 @@ function generate(thickness, lazerWidth){
         })
       });
       for(var j=0;j<rotcoords.length;j++)bezs=slice(bezs,rotcoords[j],rotcoords[(j+1)%rotcoords.length])
-      bezs.forEach(function(b){
-        svg.bezier(b,color)
-      })
+      svg.fillPath(bezs,color)
+      // bezs.forEach(function(b){
+      //   svg.bezier(b,color)
+      // })
     }
   }
 
