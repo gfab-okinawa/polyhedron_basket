@@ -1,6 +1,9 @@
 function svg2bezier(data){
   var div=document.createElement('div')
   div.innerHTML=data
+  function cross(a,b){
+    return a.x*b.y-a.y*b.x
+  }
   function traverse(el, cb){
     function each(el, trans){
       if(!trans)trans=[1,0,0,1,0,0]
@@ -49,8 +52,9 @@ function svg2bezier(data){
   }
   var beziers=[]
   traverse(div, function(el, trans){
+    var current=[]
     function bezier(p0,p1,p2,p3){
-      beziers.push([
+      current.push([
         translate(p0,trans),
         translate(p1,trans),
         translate(p2,trans),
@@ -104,6 +108,7 @@ function svg2bezier(data){
       var matches=el.getAttribute('d').match(/[A-Za-z][^a-zA-Z]*/g)
       var point=null
       var start=null
+      current=[]
       for(var i=0;i<matches.length;i++){
         var type=matches[i][0]
         var floats=(matches[i].match(/-?[\d.]+/g)||[]).map(parseFloat)
@@ -120,6 +125,7 @@ function svg2bezier(data){
         switch(type){
           case 'm':
           case 'M':
+            if(start&&(start.x!=point.x||start.y!=point.y))line(point,start)
             for(var j=0;j<values.length;j++){
               point=pathpoint(point,values[j])
               start=point
@@ -136,7 +142,7 @@ function svg2bezier(data){
           case 's':
           case 'S':
             for(var j=0;j<values.length/2;j++){
-              var bprev=beziers[beziers.length-1][2]||point
+              var bprev=current[current.length-1][2]||point
               var p1={x: 2*point.x-bprev.x, y: 2*point.y-bprev.y}
               var p2=pathpoint(point,values[2*j]), p3=pathpoint(point,values[2*j+1])
               bezier(point, p1, p2, p3)
@@ -214,12 +220,33 @@ function svg2bezier(data){
           case 'z':
           case 'Z':
             if(start.x!=point.x||start.y!=point.y)line(point,start)
+            point=start
             break
           default:
             console.error(type)
         }
       }
+      if(start&&(start.x!=point.x||start.y!=point.y))line(point,start)
     }
+    var area=0;
+    current.forEach(function(b){
+      var b1={x: (8*b[0].x+12*b[1].x+6*b[2].x+b[3].x)/27, y: (8*b[0].y+12*b[1].y+6*b[2].y+b[3].y)/27}
+      var b2={x: (b[0].x+6*b[1].x+12*b[2].x+8*b[3].x)/27, y: (b[0].y+6*b[1].y+12*b[2].y+8*b[3].y)/27}
+      area+=cross(b[0],b1)+cross(b1,b2)+cross(b2,b[3])
+    })
+    if(area*area<0.0001)return
+    var fillcolor=el.getAttribute('fill')||''
+    if(!fillcolor){
+      var styles=(el.getAttribute('style')||'').match(/fill\s*\s*:([^;]+)/)
+      if(styles)fillcolor=styles[1]
+    }
+    fillcolor=fillcolor.toLowerCase()
+    var fillwhite=fillcolor=='white'||fillcolor=='#fff'||fillcolor=='#ffffff'||!!fillcolor.match(/(255|100%).+(255|100%).+(255|100%)/)
+    var flip=(area>0)^(fillwhite)
+    current.forEach(function(bezier){
+      if(flip)beziers.push(bezier.reverse())
+      else beziers.push(bezier)
+    })
   })
   var mins, maxs
   beziers.forEach(function(b){
@@ -237,12 +264,14 @@ function svg2bezier(data){
   var s=Math.max(w,h)
 
   beziers.forEach(function(b){
+    var resolution=1024*1024*1024
     b.forEach(function(p){
-      p.x-=(maxs.x+mins.x)/2
-      p.y-=(maxs.y+mins.y)/2
-      p.x/=s
-      p.y/=s
+      p.x=(p.x-(maxs.x+mins.x)/2)/s
+      p.y=(p.y-(maxs.y+mins.y)/2)/s
+      p.x=Math.round(p.x*resolution)/resolution
+      p.y=Math.round(p.y*resolution)/resolution
     })
   })
+
   return beziers
 }
