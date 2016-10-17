@@ -157,7 +157,7 @@ onload=function(){
             x: inputParam('x',0),
             y: inputParam('y',0),
             scale: inputParam('scale',1),
-            rotate: inputParam('rotate',0)
+            rotate: inputParam('rotate',0)+0.0000001
           }
           regenerate()
         }
@@ -308,8 +308,10 @@ function generate(thickness, lazerWidth){
   faceShape(r0+r1, r0+r1*Math.cos(theta1),theta2,'black',[
     {x:r0+r1,y:len1},
     {x:r0+r1+r2,y:len2},
-    {x:r0+r1+r2+len2*qdy/qdx,y:len2/2},
-    {x:r0+r1+r2+len2*qdy/qdx,y:-len2/2},
+    {x:r0+r1+r2+len2*qdy/qdx/2,y:len2-len2/2/2},
+    {x:r0+r1+r2+len2*qdy/qdx,y:len2/4},
+    {x:r0+r1+r2+len2*qdy/qdx,y:-len2/4},
+    {x:r0+r1+r2+len2*qdy/qdx/2,y:-len2+len2/2/2},
     {x:r0+r1+r2,y:-len2},
     {x:r0+r1,y:-len1}
   ])
